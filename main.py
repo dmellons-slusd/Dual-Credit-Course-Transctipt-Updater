@@ -4,7 +4,56 @@ from sqlalchemy import text
 
 sql = core.build_sql_object()
 cnxn = aeries.get_aeries_cnxn(database="DST24000SLUSD_DAILY", access_level='w')
-def update_his_record(pid: int, cn: str, sq: str, credit_hours: int = 1.5) -> None:
+course_hourse_translation_dict = {
+"3160":	4,
+"4141":	3,
+"4142":	3,
+"5343":	3,
+"5361":	3,
+"6608AC":	3,
+"6614AC":	3,
+"6615AC":	3,
+"75551":	2,
+"75552":	2,
+"75554":	1.5,
+"75701":	3,
+"75702":	3,
+"75712":	3,
+"75801":	3,
+"75811":	3,
+"75941":	3,
+"75951":	3,
+"76011":	3,
+"76012":	3,
+"76051":	3,
+"76052":	3,
+"76141":	3,
+"76151":	3,
+"76241":	2.5,
+"76251":	2.5,
+"79102":	3,
+"79201":	3,
+"79211":	3,
+"79212":	3,
+"79220":	3,
+"79221":	3,
+"79230":	3,
+"79231":	3,
+"8250":	2,
+"8250CE":	2,
+"8250SD":	2,
+"L5795":	2.5,
+"L65051":	3,
+"L7535":	3,
+"L7540":	1.5,
+"L7573":	3,
+"L7581":	3,
+"L7594":	3,
+"L7601":	3,
+"L7614":	3,
+"L8000":	2,
+}
+def update_his_record(pid: int, cn: str, sq: str, credit_hours: int) -> None:
     update_sql = sql.update_his_dual_credit.format(
         pid=pid,
         cn=cn,
@@ -32,8 +81,12 @@ def update_dual_credit_hist() -> None:
         pid = row['PID']
         cn = row['CN']
         sq = row['SQ']
+        credit_hours = course_hourse_translation_dict.get(cn, None)
+        if credit_hours is None:
+            core.log(f"Course CN {cn} not found in translation dictionary. Skipping.")
+            continue
         # print(f'{pid, cn, sq}')
-        update_his_record(pid, cn, sq)
+        update_his_record(pid, cn, sq, credit_hours)
         pass
 
 if __name__ == "__main__":

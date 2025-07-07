@@ -3,3 +3,4 @@
 scratch.md
 *.log
 test query.sql
+*.scratch
