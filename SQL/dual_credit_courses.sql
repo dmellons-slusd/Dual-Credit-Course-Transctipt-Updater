@@ -77,4 +77,4 @@ where his.del = 0
 )
 
 -- and PID = 92029
--- and his.cn = '76241'
+-- and his.cn = '75702'
