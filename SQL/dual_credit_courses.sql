@@ -7,7 +7,6 @@ where his.del = 0
     his.mk like 'A%'
     or his.mk like 'B%'
     or his.mk like 'C%'
-    or his.mk like 'D%'
     or his.mk like 'P'
 )
     AND his.cn in ( 
@@ -75,6 +74,6 @@ where his.del = 0
 'L8000', 
 'T75361'
 )
-
+--  and cn = '79102'
 -- and PID = 92029
 -- and his.cn = '75702'
