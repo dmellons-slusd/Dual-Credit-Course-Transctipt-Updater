@@ -4,3 +4,4 @@ scratch.md
 *.log
 tests/
 *.scratch
+__pycache__/
