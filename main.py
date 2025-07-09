@@ -5,7 +5,7 @@ from sqlalchemy import text
 from decouple import config
 
 SQL = core.build_sql_object()
-CNXN = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str, default='DST24000SLUSD_DAILY'), access_level='w')
+CNXN = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str), access_level='w')
 DEFAULT_SCHOOL_ST = config('DEFAULT_SCHOOL_ST', cast=int) 
 DEFAULT_SCHOOL_SDE = config('DEFAULT_SCHOOL_SDE', cast=int) 
 

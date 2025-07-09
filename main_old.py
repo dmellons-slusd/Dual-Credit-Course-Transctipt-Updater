@@ -5,7 +5,7 @@ from sqlalchemy import text
 from decouple import config
 
 sql = core.build_sql_object()
-cnxn = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str, default='DST24000SLUSD_DAILY'), access_level='w')
+cnxn = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str), access_level='w')
 def update_his_record(pid: int, cn: str, sq: str, credit_hours: int, sde: int = 16, st: int = 20) -> None:
 
     core.log(f"Updating HIS record for PID: {pid}, CN: {cn}, SQ: {sq}")

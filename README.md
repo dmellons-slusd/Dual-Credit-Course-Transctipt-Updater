@@ -47,8 +47,8 @@ A Python application for updating dual credit course information in the Aeries S
    TEST=False  # Set to True for testing, False for production
    DATABASE=your_production_database_name
    TEST_DATABASE=your_test_database_name
-   DEFAULT_SCHOOL_ST=Default school ST for HIS records
-   DEFAULT_SCHOOL_SDE=Default school SDE for HIS records
+   DEFAULT_SCHOOL_ST=int # Default school ST for HIS records
+   DEFAULT_SCHOOL_SDE=int # Default school SDE for HIS records
    ```
 
 ## Usage
@@ -75,7 +75,9 @@ find_course('CCC289')  # Exports course data to CCC289.csv
 
 - `TEST`: Boolean flag for testing mode
 - `DATABASE`: Production database name
-- `TEST_DATABASE`: Test database name (defaults to 'DST24000SLUSD_DAILY')
+- `TEST_DATABASE`: Test database name
+- `DEFAULT_SCHOOL_ST`: Default school ST for HIS records
+- `DEFAULT_SCHOOL_SDE`: Default school SDE for HIS records
 
 ### Course Credit Hours
 
@@ -182,11 +184,11 @@ The application provides detailed logging through the `slusdlib.core` module:
 
 ## Functions
 
-### `update_his_record(pid, cn, sq, credit_hours, sde=16, st=20)`
+### `update_his_record(pid, cn, sq, credit_hours, sde=DEFAULT_SCHOOL_SDE, st=DEFAULT_SCHOOL_ST)`
 
 Updates a single HIS record with credit hours for passed courses.
 
-### `update_his_record_sde_st_only(pid, cn, sq, sde=16, st=20)`
+### `update_his_record_sde_st_only(pid, cn, sq, sde==DEFAULT_SCHOOL_SDE, st=DEFAULT_SCHOOL_ST)`
 
 Updates a single HIS record with only SDE and ST for failed courses (no credit hours).
 
