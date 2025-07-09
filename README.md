@@ -8,7 +8,6 @@ A Python application for updating dual credit course information in the Aeries S
 - Processes students individually with year-by-year course analysis
 - Intelligent handling of year-long courses with special grading rules:
   - **Course 8250 variants**: Requires C or better in at least one semester
-  - **Course 3160**: Requires passing only the second semester (TE = 2)
   - **Regular year-long courses**: Requires passing both semesters
 - Updates student history records with credit hours for passed courses
 - Updates SDE/ST designations for all dual credit courses (passed and failed)
@@ -103,7 +102,6 @@ The application now processes each student individually, analyzing their courses
 ### Year-Long Course Handling
 
 - **Course 8250 variants (8250, 8250CE, 8250SD)**: Student needs C or better in at least one semester
-- **Course 3160**: Student needs to pass only the second semester (TE = 2)
 - **All other year-long courses**: Student must pass both semesters
 
 ### Grade Processing

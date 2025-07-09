@@ -92,7 +92,7 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
             semester_data = []
             
             for _, row in course_group.iterrows():
-                grade = row.get('MK', '')  # Assuming 'MK' is the grade column
+                grade = row.get('MK', '')  
                 passed = is_passing_grade(grade)
                 semester_data.append({
                     'semester': row['SQ'],
@@ -118,23 +118,6 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
                 }
                 
                 core.log(f"8250 variant course {cn}: {'PASSED' if passed_8250 else 'FAILED'} - needs C or better in one semester")
-                
-            # Special handling for course 3160
-            elif cn == '3160':
-                # For 3160, only need to pass the second semester (TE == 2)
-                second_semester_passed = False
-                for sem_data in semester_data:
-                    if sem_data['term'] == '2' and sem_data['passed']:
-                        second_semester_passed = True
-                        break
-                
-                course_status[cn] = {
-                    'passed': second_semester_passed,
-                    'semesters': semester_data,
-                    'is_year_long': True
-                }
-                
-                core.log(f"Course 3160: {'PASSED' if second_semester_passed else 'FAILED'} - needs to pass second semester (TE=2)")
                 
             else:
                 # Regular year-long courses need both semesters passed
