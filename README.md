@@ -47,6 +47,8 @@ A Python application for updating dual credit course information in the Aeries S
    TEST=False  # Set to True for testing, False for production
    DATABASE=your_production_database_name
    TEST_DATABASE=your_test_database_name
+   DEFAULT_SCHOOL_ST=Default school ST for HIS records
+   DEFAULT_SCHOOL_SDE=Default school SDE for HIS records
    ```
 
 ## Usage

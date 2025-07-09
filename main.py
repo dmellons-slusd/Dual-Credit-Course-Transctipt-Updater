@@ -1,19 +1,21 @@
-from pandas import read_sql_query
+from pandas import DataFrame, read_sql_query
 from slusdlib import aeries, core, decorators
 from course_hour_mappings import COURSE_HOURS_MAPPING, get_course_hours
 from sqlalchemy import text
 from decouple import config
 
-sql = core.build_sql_object()
-cnxn = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str, default='DST24000SLUSD_DAILY'), access_level='w')
+SQL = core.build_sql_object()
+CNXN = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str, default='DST24000SLUSD_DAILY'), access_level='w')
+DEFAULT_SCHOOL_ST = config('DEFAULT_SCHOOL_ST', cast=int) 
+DEFAULT_SCHOOL_SDE = config('DEFAULT_SCHOOL_SDE', cast=int) 
 
-def update_his_record(pid: int, cn: str, sq: str, credit_hours: float, sde: int = 16, st: int = 20) -> None:
+def update_his_record(pid: int, cn: str, sq: str, credit_hours: float, sde: int = 16, st: int = DEFAULT_SCHOOL_ST) -> None:
     """Update a single HIS record with dual credit information including credit hours."""
     core.log(f"Updating HIS record (with credit hours) for PID: {pid}, CN: {cn}, SQ: {sq}")
     try:
-        with cnxn.connect() as conn:
+        with CNXN.connect() as conn:
             conn.execute(
-                text(sql.update_his_dual_credit_pass),
+                text(SQL.update_his_dual_credit_pass),
                 {
                     "sde": sde,
                     "st": st,
@@ -27,16 +29,16 @@ def update_his_record(pid: int, cn: str, sq: str, credit_hours: float, sde: int 
             core.log(f"Successfully updated record with credit hours")
     except Exception as e:
         core.log(f"Error updating record for PID {pid}: {e}")
-        cnxn.rollback()
+        CNXN.rollback()
         raise
 
-def update_his_record_sde_st_only(pid: int, cn: str, sq: str, sde: int = 16, st: int = 20) -> None:
+def update_his_record_sde_st_only(pid: int, cn: str, sq: str, sde: int = 16, st: int = DEFAULT_SCHOOL_ST) -> None:
     """Update a single HIS record with only SDE and ST (for failed courses)."""
     core.log(f"Updating HIS record (SDE/ST only) for PID: {pid}, CN: {cn}, SQ: {sq}")
     try:
-        with cnxn.connect() as conn:
+        with CNXN.connect() as conn:
             conn.execute(
-                text(sql.update_his_dual_credit_fail),
+                text(SQL.update_his_dual_credit_fail),
                 {
                     "sde": sde,
                     "st": st,
@@ -49,7 +51,7 @@ def update_his_record_sde_st_only(pid: int, cn: str, sq: str, sde: int = 16, st:
             core.log(f"Successfully updated record with SDE/ST only")
     except Exception as e:
         core.log(f"Error updating SDE/ST for PID {pid}: {e}")
-        cnxn.rollback()
+        CNXN.rollback()
         raise
 
 def is_passing_grade(grade: str) -> bool:
@@ -62,7 +64,7 @@ def is_passing_grade(grade: str) -> bool:
             grade.startswith('C') or 
             grade == 'P')
 
-def check_year_long_pass(courses) -> dict:
+def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
     """
     Check if a student has passed both semesters of year-long courses.
     Special handling:
@@ -85,7 +87,7 @@ def check_year_long_pass(courses) -> dict:
         # Check if this course has both semester 1 and 2
         semesters = course_group['SQ'].unique()
         
-        if len(semesters) == 2 and set(semesters) == {'1', '2'}:
+        if (len(semesters) == 2 and set(semesters) == {'1', '2'}) or course_terms.get(cn, None) == 'Y':
             # This is a year-long course
             semester_data = []
             
@@ -164,11 +166,11 @@ def check_year_long_pass(courses) -> dict:
 @decorators.log_function_timer
 def update_dual_credit_hist() -> None:
     """Main function to update dual credit history records."""
-    data = read_sql_query(sql.dual_credit_courses, cnxn)
+    data = read_sql_query(SQL.dual_credit_courses, CNXN)
     if data.empty: 
         core.log("No dual credit courses found to update.")
         return
-      
+    course_terms = get_course_terms()  
     # Process each student individually
     student_ids = data['PID'].unique()
    
@@ -184,7 +186,7 @@ def update_dual_credit_hist() -> None:
             courses = student_data[student_data['YR'] == year]
             core.log(f"Processing PID: {pid}, Year: {year} with {len(courses)} courses")
             
-            course_status = check_year_long_pass(courses)
+            course_status = check_year_long_pass(courses, course_terms)
             
             # Update records for all courses (passed courses get credit hours, failed courses get SDE/ST only)
             for index, row in courses.iterrows():
@@ -202,6 +204,10 @@ def update_dual_credit_hist() -> None:
                 if cn in course_status:
                     if course_status[cn]['passed']:
                         core.log(f"Course {cn} passed - updating record with credit hours")
+                        if course_status[cn]['is_year_long']:
+                            # For year-long courses, split credit hours between semesters
+                            credit_hours = credit_hours / 2 if credit_hours else 0
+
                         update_his_record(pid_int, cn, sq, credit_hours)
                     else:
                         core.log(f"Course {cn} not passed - updating SDE/ST only for PID {pid_int}")
@@ -212,14 +218,22 @@ def update_dual_credit_hist() -> None:
 
 def find_course(course: str) -> None:
     """Export data for a specific course to CSV for analysis."""
-    data = read_sql_query(sql.dual_credit_courses, cnxn)
+    data = read_sql_query(SQL.dual_credit_courses, CNXN)
     course_data = data[data['CN'] == course]
     course_data.to_csv(f'{course}.csv', index=False)
     core.log(f"Exported {len(course_data)} records for course {course} to {course}.csv")
+
+def get_course_terms() -> dict:
+    courses = f"'{"', '".join(list(COURSE_HOURS_MAPPING.keys()))}'"
+    course_terms = read_sql_query(f"""
+    select distinct cn, tm
+    from crs
+    where cn in ({courses})
+    """, CNXN)
+    return course_terms.set_index('cn')['tm'].to_dict()
 
 if __name__ == "__main__":
     core.log("$"*80)
     core.log(f"Starting update_dual_credit_hist")
     update_dual_credit_hist()
-    # find_course('CCC289')
     core.log("~"*80)
