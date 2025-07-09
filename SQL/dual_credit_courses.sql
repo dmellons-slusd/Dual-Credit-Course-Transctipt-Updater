@@ -3,12 +3,12 @@ select
 from his
 where his.del = 0
     AND his.gr in (9,10,11,12)
-    AND (
-    his.mk like 'A%'
-    or his.mk like 'B%'
-    or his.mk like 'C%'
-    or his.mk like 'P'
-)
+--     AND (
+--     his.mk like 'A%'
+--     or his.mk like 'B%'
+--     or his.mk like 'C%'
+--     or his.mk like 'P'
+-- )
     AND his.cn in ( 
 '3160', 
 '4141', 
@@ -74,3 +74,5 @@ where his.del = 0
 'L8000', 
 'T75361'
 )
+
+order by his.yr desc,  his.pid, his.te asc

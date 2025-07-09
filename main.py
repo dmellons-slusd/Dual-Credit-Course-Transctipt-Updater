@@ -42,10 +42,10 @@ def update_dual_credit_hist() -> None:
         sq = row['SQ']
         credit_hours = get_course_hours(cn)
         if credit_hours is None:
-            core.log(f"Course CN {cn} not found in translation dictionary. Skipping.")
+            core.log(f"Course CN {cn} not found in translation dictionary. Skipping for ID#{pid}.")
             continue
         update_his_record(pid, cn, sq, credit_hours)
-        pass
+        
 def find_course(course: str) -> None:
     data = read_sql_query(sql.dual_credit_courses, cnxn)
     course_data = data[data['CN'] == course]
