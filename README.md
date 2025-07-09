@@ -1,14 +1,20 @@
 # Dual Credit Course Updater
 
-A Python application for updating dual credit course information in the Aeries Student Information System. This tool automatically updates student history records with appropriate credit hours for dual credit courses.
+A Python application for updating dual credit course information in the Aeries Student Information System. This tool automatically updates student history records with appropriate credit hours for dual credit courses, with intelligent handling of year-long courses and different grading requirements.
 
 ## Features
 
 - Queries dual credit courses from Aeries database
-- Updates student history records with credit hours and special designations
+- Processes students individually with year-by-year course analysis
+- Intelligent handling of year-long courses with special grading rules:
+  - **Course 8250 variants**: Requires C or better in at least one semester
+  - **Course 3160**: Requires passing only the second semester (TE = 2)
+  - **Regular year-long courses**: Requires passing both semesters
+- Updates student history records with credit hours for passed courses
+- Updates SDE/ST designations for all dual credit courses (passed and failed)
 - Supports both production and testing environments
-- Comprehensive logging with function timing
-- Course-specific credit hour mapping with 65+ supported courses
+- Comprehensive logging with function timing and detailed course processing
+- Course-specific credit hour mapping with 40+ supported courses
 - Exports course data for analysis
 
 ## Prerequisites
@@ -79,16 +85,45 @@ The application includes a comprehensive mapping dictionary for course numbers t
 - **2 Credit Hour Courses**: 75551, 75552, 8250, 8250CE, 8250SD, L8000
 - **1.5 Credit Hour Courses**: 75554, L7540
 
+## Processing Logic
+
+### Student-by-Student Processing
+
+The application now processes each student individually, analyzing their courses year by year to properly handle:
+
+1. **Year-Long Course Detection**: Identifies courses with both semester 1 and 2 records
+2. **Special Grading Rules**: Applies course-specific passing requirements
+3. **Credit Hour Assignment**: Awards credit hours only to students who meet passing criteria
+4. **SDE/ST Updates**: Updates special designations for all dual credit courses regardless of pass/fail status
+
+### Year-Long Course Handling
+
+- **Course 8250 variants (8250, 8250CE, 8250SD)**: Student needs C or better in at least one semester
+- **Course 3160**: Student needs to pass only the second semester (TE = 2)
+- **All other year-long courses**: Student must pass both semesters
+
+### Grade Processing
+
+The application recognizes passing grades as:
+
+- A grades (A+, A, A-)
+- B grades (B+, B, B-)
+- C grades (C+, C, C-)
+- P (Pass)
+
 ## Database Schema
 
 The application works with the following key database fields:
 
 - `PID`: Student ID
 - `CN`: Course Number
-- `SQ`: Sequence Number
+- `SQ`: Sequence Number (semester: 1 or 2)
+- `TE`: Term (1 or 2)
+- `MK`: Grade/Mark
+- `YR`: Academic Year
 - `CH`: Credit Hours
-- `SDE`: Special Designation (defaults to 16 --> `SLHS`)
-- `ST`: Status (defaults to 20 --> `Chabot Comm College`)
+- `SDE`: Special Designation (defaults to 16 → `SLHS`)
+- `ST`: Status (defaults to 20 → `Chabot Comm College`)
 
 ## SQL Queries
 
@@ -97,23 +132,25 @@ The application works with the following key database fields:
 The application selects courses based on:
 
 - Active records (del = 0)
+- Active students (stu.del = 0, stu.tg = '')
 - Grades 9-12 (gr in 9,10,11,12)
-- Passing marks (A%, B%, C%, P)
 - Specific course numbers from the dual credit list (65+ courses)
 
 ### Record Updates
 
-Updates are performed using parameterized queries to prevent SQL injection and update the HIS table with:
+Two types of updates are performed:
 
-- Credit hours based on course mapping
-- Special designation (SDE = 16)
-- Status (ST = 20)
+1. **Passed Courses**: Updates CH (credit hours), SDE, and ST
+2. **Failed Courses**: Updates only SDE and ST (no credit hours awarded)
 
 ## Logging
 
-The application uses comprehensive logging through the `slusdlib.core` module:
+The application provides detailed logging through the `slusdlib.core` module:
 
 - Function execution timing via `@decorators.log_function_timer`
+- Student-by-student processing progress
+- Year-by-year course analysis
+- Course passing/failing status with reasoning
 - Database operation results
 - Error handling and rollback notifications
 - Skipped courses not in mapping dictionary
@@ -124,15 +161,18 @@ The application uses comprehensive logging through the `slusdlib.core` module:
 - Missing course mappings are logged and skipped
 - Transaction rollbacks occur on update failures
 - Individual record failures don't stop the entire process
+- Graceful handling of missing grade data
 
 ## File Structure
 
 ```text
-├── main.py                          # Main application file
+├── main.py                          # Main application file (updated logic)
+├── main_old.py                      # Previous version (row-by-row processing)
 ├── course_hour_mappings.py          # Course number to credit hours mapping
 ├── SQL/
 │   ├── dual_credit_courses.sql      # Query for dual credit courses
-│   └── update_his_dual_credit.sql   # Update query for HIS records
+│   ├── update_his_dual_credit_pass.sql  # Update query for passed courses
+│   └── update_his_dual_credit_fail.sql  # Update query for failed courses
 ├── .env.example                     # Environment variable template
 ├── .gitignore                       # Git ignore file
 └── README.md                        # This file
@@ -142,11 +182,23 @@ The application uses comprehensive logging through the `slusdlib.core` module:
 
 ### `update_his_record(pid, cn, sq, credit_hours, sde=16, st=20)`
 
-Updates a single HIS record with the specified parameters.
+Updates a single HIS record with credit hours for passed courses.
+
+### `update_his_record_sde_st_only(pid, cn, sq, sde=16, st=20)`
+
+Updates a single HIS record with only SDE and ST for failed courses (no credit hours).
+
+### `is_passing_grade(grade)`
+
+Determines if a grade is passing (A, B, C, or P).
+
+### `check_year_long_pass(courses)`
+
+Analyzes courses for a student in a specific year to determine pass/fail status with special handling for year-long courses.
 
 ### `update_dual_credit_hist()`
 
-Main function that processes all dual credit courses and updates their records.
+Main function that processes all dual credit courses student-by-student, year-by-year.
 
 ### `find_course(course)`
 
@@ -169,3 +221,4 @@ Returns credit hours for a given course number, or None if not found.
 - CSV exports and logs are ignored in version control
 - The `slusdlib` custom library handles database connections and logging
 - Course mappings can be easily extended by adding to the dictionary in `course_hour_mappings.py`
+- The previous row-by-row processing logic is preserved in `main_old.py` for reference

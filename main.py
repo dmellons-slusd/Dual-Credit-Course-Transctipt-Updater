@@ -3,7 +3,6 @@ from slusdlib import aeries, core, decorators
 from course_hour_mappings import COURSE_HOURS_MAPPING, get_course_hours
 from sqlalchemy import text
 from decouple import config
-from icecream import ic
 
 sql = core.build_sql_object()
 cnxn = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str, default='DST24000SLUSD_DAILY'), access_level='w')
