@@ -64,15 +64,16 @@ def is_passing_grade(grade: str) -> bool:
             grade.startswith('C') or 
             grade == 'P')
 
-def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
+def check_year_long_pass(courses: DataFrame, course_terms: dict) -> dict:
     """
     Check if a student has passed both semesters of year-long courses.
     Special handling:
     - Course 8250 variants: only need C or better in one semester
-    - Course 3160: only need to pass the second semester (TE == 2)
+    - Regular year-long courses: pass if second semester is passed (even if first failed)
     
     Args:
         courses: DataFrame of courses for a student in a specific year
+        course_terms: Dictionary mapping course numbers to term types
         
     Returns:
         dict: Dictionary mapping course numbers to pass status
@@ -85,9 +86,9 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
     
     for cn, course_group in course_groups:
         # Check if this course has both semester 1 and 2
-        semesters = course_group['SQ'].unique()
+        terms = course_group['TE'].unique()
         
-        if (len(semesters) == 2 and set(semesters) == {'1', '2'}) or course_terms.get(cn, None) == 'Y':
+        if (len(terms) == 2 and set(terms) == {1, 2}) or course_terms.get(cn, None) == 'Y':
             # This is a year-long course
             semester_data = []
             
@@ -95,7 +96,7 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
                 grade = row.get('MK', '')  
                 passed = is_passing_grade(grade)
                 semester_data.append({
-                    'semester': row['SQ'],
+                    'semester': row.get('TE', ''),  # TE is the term/semester
                     'term': row.get('TE', ''),
                     'grade': grade,
                     'passed': passed
@@ -120,15 +121,27 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
                 core.log(f"8250 variant course {cn}: {'PASSED' if passed_8250 else 'FAILED'} - needs C or better in one semester")
                 
             else:
-                # Regular year-long courses need both semesters passed
-                all_passed = all(sem_data['passed'] for sem_data in semester_data)
+                # Regular year-long courses: pass if second semester is passed
+                # Find semester 1 and 2 data
+                sem1_data = next((sem for sem in semester_data if sem['semester'] == 1), None)
+                sem2_data = next((sem for sem in semester_data if sem['semester'] == 2), None)
+                
+                # Course passes if second semester is passed
+                if sem2_data and sem2_data['passed']:
+                    course_passed = True
+                    if sem1_data and not sem1_data['passed']:
+                        core.log(f"Year-long course {cn}: PASSED - failed first semester but passed second semester")
+                    else:
+                        core.log(f"Year-long course {cn}: PASSED - passed second semester")
+                else:
+                    course_passed = False
+                    core.log(f"Year-long course {cn}: FAILED - did not pass second semester")
+                
                 course_status[cn] = {
-                    'passed': all_passed,
+                    'passed': course_passed,
                     'semesters': semester_data,
                     'is_year_long': True
                 }
-                
-                core.log(f"Year-long course {cn}: {'PASSED' if all_passed else 'FAILED'} both semesters")
             
         else:
             # Single semester course
@@ -138,7 +151,7 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
             
             course_status[cn] = {
                 'passed': passed,
-                'semesters': [{'semester': row['SQ'], 'term': row.get('TE', ''), 'grade': grade, 'passed': passed}],
+                'semesters': [{'semester': row.get('TE', ''), 'term': row.get('TE', ''), 'grade': grade, 'passed': passed}],
                 'is_year_long': False
             }
             
