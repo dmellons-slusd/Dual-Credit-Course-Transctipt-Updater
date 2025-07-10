@@ -9,6 +9,7 @@ SQL = core.build_sql_object()
 CNXN = aeries.get_aeries_cnxn(database=config('DATABASE', cast=str), access_level='w') if config('TEST', cast=bool) == False else aeries.get_aeries_cnxn(database=config('TEST_DATABASE', cast=str), access_level='w')
 DEFAULT_SCHOOL_ST = config('DEFAULT_SCHOOL_ST', cast=int) 
 DEFAULT_SCHOOL_SDE = config('DEFAULT_SCHOOL_SDE', cast=int) 
+ROP_LOCATION_CODE_ST = config('ROP_LOCATION_CODE_ST', cast=int)
 
 def update_his_record(pid: int, cn: str, sq: str, credit_hours: float, sde: int = 16, st: int = DEFAULT_SCHOOL_ST) -> None:
     """Update a single HIS record with dual credit information including credit hours."""
@@ -64,7 +65,8 @@ def is_passing_grade(grade: str) -> bool:
             grade.startswith('B') or 
             grade.startswith('C') or 
             grade == 'P')
-
+  
+    
 def check_year_long_pass(courses: DataFrame, course_terms: dict) -> dict:
     """
     Check if a student has passed both semesters of year-long courses.
@@ -192,6 +194,7 @@ def update_dual_credit_hist() -> None:
                 sq = str(row['SQ'])  
                 pid_int = int(row['PID'])  
                 credit_hours = get_course_hours(cn)
+                location_code_st = check_offered_at_location(cn)
                 
                 if credit_hours is None:
                     core.log(f"Course CN {cn} not found in translation dictionary. Skipping for PID {pid_int}.")
@@ -205,13 +208,14 @@ def update_dual_credit_hist() -> None:
                             # For year-long courses, split credit hours between semesters
                             credit_hours = credit_hours / 2 if credit_hours else 0
 
-                        update_his_record(pid_int, cn, sq, credit_hours)
+                        update_his_record(pid_int, cn, sq, credit_hours, st=location_code_st)
                     else:
                         core.log(f"Course {cn} not passed - updating SDE/ST only for PID {pid_int}")
-                        update_his_record_sde_st_only(pid_int, cn, sq)
+                        
+                        update_his_record_sde_st_only(pid_int, cn, sq, st=location_code_st)
                 else:
                     core.log(f"Course {cn} status unknown - updating SDE/ST only for PID {pid_int}")
-                    update_his_record_sde_st_only(pid_int, cn, sq)
+                    update_his_record_sde_st_only(pid_int, cn, sq, st=location_code_st)
 
 def find_course(course: str) -> None:
     """Export data for a specific course to CSV for analysis."""
@@ -229,6 +233,27 @@ def get_course_terms() -> dict:
     """, CNXN)
     return course_terms.set_index('cn')['tm'].to_dict()
 
+def check_offered_at_location(cn: str) -> int:
+    
+    try:
+        with CNXN.connect() as conn:
+            result = conn.execute(text(SQL.check_offered_at_location), {"cn": cn})
+            row = result.fetchone()
+            department_code = row[0] if row else None
+            
+            if department_code is None:
+                core.log(f"No location code found for course {cn}. Defaulting to {DEFAULT_SCHOOL_ST}.")
+                return DEFAULT_SCHOOL_ST
+            if department_code == 'R':
+                return ROP_LOCATION_CODE_ST
+            else:
+                return DEFAULT_SCHOOL_ST
+    except Exception as e:
+        core.log(f"Error checking offered at location for course {cn}: {e}")
+        return None
+   
+
+
 if __name__ == "__main__":
     core.log("$"*80)
     core.log(f"Starting update_dual_credit_hist")
@@ -237,3 +262,5 @@ if __name__ == "__main__":
     core.log(f"Starting update_articulated_courses")
     update_articulated_courses()
     core.log("$"*80)
+    # check = check_offered_at_location('75341')
+    # print(check)

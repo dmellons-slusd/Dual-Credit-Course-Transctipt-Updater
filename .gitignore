@@ -5,3 +5,4 @@ scratch.md
 tests/
 *.scratch
 __pycache__/
+log_crawler.py
