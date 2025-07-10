@@ -102,7 +102,7 @@ def check_year_long_pass(courses:DataFrame, course_terms: dict) -> dict:
                 })
             
             # Special handling for course 8250 variants
-            if cn in ['8250', '8250CE', '8250SD']:
+            if cn in ['8250']:
                 # For 8250 variants, only need C or better in one semester
                 c_or_better_grades = []
                 for sem_data in semester_data:
