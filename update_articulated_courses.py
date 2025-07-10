@@ -1,7 +1,7 @@
 from pandas import DataFrame, read_sql_query
 from slusdlib import aeries, core, decorators
 from course_hour_mappings import COURSE_HOURS_MAPPING, get_course_hours
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from decouple import config
 
 SQL = core.build_sql_object()
@@ -18,10 +18,12 @@ def update_articulated_courses() -> None:
     with CNXN.connect() as conn:
         # Fetch all HIS records for articulated courses
         conn.execute(
-            text(SQL.update_articulated_courses_bulk),
+            text(SQL.update_articulated_courses_bulk).bindparams(
+                bindparam("cn_list", expanding=True)
+            ),
             {
                 "cl": 24,
-                "cn_list": articulated_courses_sql
+                "cn_list": articulated_courses
                 
             }
         )
@@ -37,7 +39,7 @@ def update_articulated_courses() -> None:
         conn.execute(
             text(SQL.update_articulated_courses_bulk),
             {
-                "cl": '23',
+                "cl": 23,
                 "cn_list": college_credit_only_courses_sql
                 
             }
