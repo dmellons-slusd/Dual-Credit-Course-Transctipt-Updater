@@ -13,39 +13,48 @@ def update_articulated_courses() -> None:
     Update CRS records for articulated courses based on course mappings.
     """
     articulated_courses: list[str] = list(COURSE_HOURS_MAPPING.keys())
-    articulated_courses_sql: str = "'" + "','".join(articulated_courses) + "'" 
-   
-    with CNXN.connect() as conn:
-        # Fetch all HIS records for articulated courses
-        conn.execute(
-            text(SQL.update_articulated_courses_bulk).bindparams(
-                bindparam("cn_list", expanding=True)
-            ),
-            {
-                "cl": 24,
-                "cn_list": articulated_courses
-                
-            }
-        )
-        conn.commit()
-        core.log(f"Updated {len(articulated_courses)} articulated courses to CL = 24.")
-
-        college_credit_only_courses: list[str] = [
-            '4141',
-            '4142'
-        ]
-        college_credit_only_courses_sql: str = "'" + "','".join(college_credit_only_courses) + "'" 
-        print(college_credit_only_courses_sql)
-        conn.execute(
-            text(SQL.update_articulated_courses_bulk),
-            {
-                "cl": 23,
-                "cn_list": college_credit_only_courses_sql
-                
-            }
-        )
-        conn.commit()
-        core.log(f"Updated {len(college_credit_only_courses)} articulated courses to CL = 23.")
     
+    # Update college credit only courses
+    college_credit_only_courses: list[str] = [
+        '4141',
+        '4142'
+    ]
+    
+    with CNXN.connect() as conn:
+
+        try:
+            sql_statement = text(SQL.update_articulated_courses_bulk).bindparams(
+                bindparam("cn_list", expanding=True)
+            )
+            result = conn.execute(
+                sql_statement,
+                {
+                    "cl": 24,
+                    "cn_list": articulated_courses
+                }
+            )
+            conn.commit()
+            core.log(f"Updated {result.rowcount} articulated courses to CL = 24.")
+        except Exception as e:
+            core.log(f"Error updating articulated courses: {e}")
+            raise
+
+        
+        try:
+            sql_statement = text(SQL.update_articulated_courses_bulk).bindparams(
+                bindparam("cn_list", expanding=True)
+            )
+            result = conn.execute(
+                sql_statement,
+                {
+                    "cl": 23,
+                    "cn_list": college_credit_only_courses
+                }
+            )
+            conn.commit()
+            core.log(f"Updated {result.rowcount} college credit only courses to CL = 23.")
+        except Exception as e:
+            core.log(f"Error updating college credit only courses: {e}")
+            raise
 if __name__ == "__main__":
     update_articulated_courses()

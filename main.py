@@ -1,6 +1,7 @@
 from pandas import DataFrame, read_sql_query
 from slusdlib import aeries, core, decorators
 from course_hour_mappings import COURSE_HOURS_MAPPING, get_course_hours
+from update_articulated_courses import update_articulated_courses
 from sqlalchemy import text
 from decouple import config
 
@@ -232,4 +233,7 @@ if __name__ == "__main__":
     core.log("$"*80)
     core.log(f"Starting update_dual_credit_hist")
     update_dual_credit_hist()
-    core.log("~"*80)
+    core.log("$"*80)
+    core.log(f"Starting update_articulated_courses")
+    update_articulated_courses()
+    core.log("$"*80)
