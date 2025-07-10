@@ -11,6 +11,7 @@ A Python application for updating dual credit course information in the Aeries S
   - **Regular year-long courses**: Requires passing both semesters
 - Updates student history records with credit hours for passed courses
 - Updates SDE/ST designations for all dual credit courses (passed and failed)
+- Location-based ST assignment: Automatically assigns appropriate location codes based on course department
 - Supports both production and testing environments
 - Comprehensive logging with function timing and detailed course processing
 - Course-specific credit hour mapping with 40+ supported courses
@@ -48,6 +49,7 @@ A Python application for updating dual credit course information in the Aeries S
    TEST_DATABASE=your_test_database_name
    DEFAULT_SCHOOL_ST=int # Default school ST for HIS records
    DEFAULT_SCHOOL_SDE=int # Default school SDE for HIS records
+   ROP_LOCATION_CODE_ST=int # Location code for ROP courses
    ```
 
 ## Usage
@@ -77,6 +79,7 @@ find_course('CCC289')  # Exports course data to CCC289.csv
 - `TEST_DATABASE`: Test database name
 - `DEFAULT_SCHOOL_ST`: Default school ST for HIS records
 - `DEFAULT_SCHOOL_SDE`: Default school SDE for HIS records
+- `ROP_LOCATION_CODE_ST`: Location code for ROP courses
 
 ### Course Credit Hours
 
@@ -98,6 +101,7 @@ The application now processes each student individually, analyzing their courses
 2. **Special Grading Rules**: Applies course-specific passing requirements
 3. **Credit Hour Assignment**: Awards credit hours only to students who meet passing criteria
 4. **SDE/ST Updates**: Updates special designations for all dual credit courses regardless of pass/fail status
+5. **Location-Based Assignment**: Automatically assigns appropriate ST codes based on course department
 
 ### Year-Long Course Handling
 
@@ -113,6 +117,13 @@ The application recognizes passing grades as:
 - C grades (C+, C, C-)
 - P (Pass)
 
+### Location Code Assignment
+
+The application automatically assigns ST (location) codes based on course department:
+
+- **ROP Courses**: Courses with department code 'R' receive the ROP location code
+- **Regular Courses**: All other courses receive the default school location code
+
 ## Database Schema
 
 The application works with the following key database fields:
@@ -125,7 +136,8 @@ The application works with the following key database fields:
 - `YR`: Academic Year
 - `CH`: Credit Hours
 - `SDE`: Special Designation (defaults to 16 → `SLHS`)
-- `ST`: Status (defaults to 20 → `Chabot Comm College`)
+- `ST`: Status (defaults to 20 → `Chabot Comm College`, or ROP location code for ROP courses)
+- `DC`: Department Code (used for location assignment)
 
 ## SQL Queries
 
@@ -138,12 +150,19 @@ The application selects courses based on:
 - Grades 9-12 (gr in 9,10,11,12)
 - Specific course numbers from the dual credit list (65+ courses)
 
+### Location Code Lookup
+
+The application queries the CRS table to determine department codes for appropriate location assignment:
+
+- Queries `dc` (department code) from `crs` table
+- Uses course number (`cn`) to match records
+
 ### Record Updates
 
 Two types of updates are performed:
 
-1. **Passed Courses**: Updates CH (credit hours), SDE, and ST
-2. **Failed Courses**: Updates only SDE and ST (no credit hours awarded)
+1. **Passed Courses**: Updates CH (credit hours), SDE, and ST (with location-based assignment)
+2. **Failed Courses**: Updates only SDE and ST (with location-based assignment, no credit hours awarded)
 
 ## Logging
 
@@ -153,6 +172,7 @@ The application provides detailed logging through the `slusdlib.core` module:
 - Student-by-student processing progress
 - Year-by-year course analysis
 - Course passing/failing status with reasoning
+- Location code assignment for each course
 - Database operation results
 - Error handling and rollback notifications
 - Skipped courses not in mapping dictionary
@@ -161,6 +181,7 @@ The application provides detailed logging through the `slusdlib.core` module:
 
 - Database connection failures are logged and handled
 - Missing course mappings are logged and skipped
+- Location code lookup failures default to standard school code
 - Transaction rollbacks occur on update failures
 - Individual record failures don't stop the entire process
 - Graceful handling of missing grade data
@@ -171,10 +192,14 @@ The application provides detailed logging through the `slusdlib.core` module:
 ├── main.py                          # Main application file (updated logic)
 ├── main_old.py                      # Previous version (row-by-row processing)
 ├── course_hour_mappings.py          # Course number to credit hours mapping
+├── update_articulated_courses.py   # Update articulated course records
 ├── SQL/
 │   ├── dual_credit_courses.sql      # Query for dual credit courses
+│   ├── check_offered_at_location.sql # Query for course location lookup
 │   ├── update_his_dual_credit_pass.sql  # Update query for passed courses
-│   └── update_his_dual_credit_fail.sql  # Update query for failed courses
+│   ├── update_his_dual_credit_fail.sql  # Update query for failed courses
+│   ├── update_articulated_course.sql    # Update single articulated course
+│   └── update_articulated_courses_bulk.sql # Update multiple articulated courses
 ├── .env.example                     # Environment variable template
 ├── .gitignore                       # Git ignore file
 └── README.md                        # This file
@@ -186,7 +211,7 @@ The application provides detailed logging through the `slusdlib.core` module:
 
 Updates a single HIS record with credit hours for passed courses.
 
-### `update_his_record_sde_st_only(pid, cn, sq, sde==DEFAULT_SCHOOL_SDE, st=DEFAULT_SCHOOL_ST)`
+### `update_his_record_sde_st_only(pid, cn, sq, sde=DEFAULT_SCHOOL_SDE, st=DEFAULT_SCHOOL_ST)`
 
 Updates a single HIS record with only SDE and ST for failed courses (no credit hours).
 
@@ -197,6 +222,18 @@ Determines if a grade is passing (A, B, C, or P).
 ### `check_year_long_pass(courses)`
 
 Analyzes courses for a student in a specific year to determine pass/fail status with special handling for year-long courses.
+
+### `check_offered_at_location(cn)`
+
+Checks the department code for a course and returns the appropriate location code (ST value).
+
+- **Parameters**: `cn` (str) - Course number to check
+- **Returns**: `int` - Location code (ROP_LOCATION_CODE_ST for ROP courses, DEFAULT_SCHOOL_ST for others)
+- **Logic**: 
+  - Queries the CRS table for department code (`dc`)
+  - Returns ROP location code if department code is 'R'
+  - Returns default school location code for all other departments
+  - Defaults to DEFAULT_SCHOOL_ST if no department code found
 
 ### `update_dual_credit_hist()`
 
@@ -209,6 +246,10 @@ Utility function to export data for a specific course to CSV for analysis.
 ### `get_course_hours(course_number)`
 
 Returns credit hours for a given course number, or None if not found.
+
+### `get_course_terms()`
+
+Returns a dictionary mapping course numbers to their term types.
 
 ## Security Notes
 
@@ -224,3 +265,4 @@ Returns credit hours for a given course number, or None if not found.
 - The `slusdlib` custom library handles database connections and logging
 - Course mappings can be easily extended by adding to the dictionary in `course_hour_mappings.py`
 - The previous row-by-row processing logic is preserved in `main_old.py` for reference
+- Location-based ST assignment ensures proper categorization of ROP vs. regular courses
