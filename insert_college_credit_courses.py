@@ -49,7 +49,7 @@ def get_next_sq(pid: int = None, id: int = None, table: str = 'his') -> int:
         last_sq = read_sql_query(sql, CNXN, params={'id': id})['sq'].iloc[0]
         return int(last_sq + 1) if last_sq is not None else 1
 
-def insert_new_his_record(pid: int, cn: str, mk: str, cr: float, gr: int,  yr: int, st: int, cc: float, sq: int, sde: int, ch: float, sid:int = 9999999999, co:str = '', te: int = 1) -> None:
+def insert_new_his_record(pid: int, cn: str, mk: str, cr: float, gr: int,  yr: int, st: int, cc: float, sq: int, sde: int, ch: float, sid:int = 11110, co:str = '', te: int = 1) -> None:
     params = {
         "pid": int(pid),
         "cn": str(cn),
