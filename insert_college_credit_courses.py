@@ -49,29 +49,31 @@ def get_next_sq(pid: int = None, id: int = None, table: str = 'his') -> int:
         last_sq = read_sql_query(sql, CNXN, params={'id': id})['sq'].iloc[0]
         return int(last_sq + 1) if last_sq is not None else 1
 
-def insert_new_his_record(pid: int, cn: str, mk: str, cr: str, gr: str, te: str, yr: str, st: int, cc: str, sq: int, sde: int, ch: float) -> None:
+def insert_new_his_record(pid: int, cn: str, mk: str, cr: float, gr: int, te: int, yr: int, st: int, cc: float, sq: int, sde: int, ch: float) -> None:
     with CNXN.connect() as conn:
         sql = text(SQL.insert_his_record)
         try:
             conn.execute(sql, {
-                "pid":int(pid),
-                "cn":cn,
-                "mk":mk,
-                "cr":cr,
-                "gr":gr,
-                "te":te,
-                "yr":yr,
-                "st":st,
-                "cc":cc,
-                "sq":sq,
-                "sde":sde,
-                "ch":ch
+                "pid": int(pid),
+                "cn": str(cn),
+                "mk": str(mk),
+                "cr": float(cr), 
+                "gr": int(gr),    
+                "te": int(te),   
+                "yr": int(yr),    
+                "st": int(st),   
+                "cc": float(cc), 
+                "sq": int(sq),    
+                "sde": int(sde),  
+                "ch": float(ch)   
             })
             conn.commit()
             print(f"Successfully inserted new record for PID: {pid}, CN: {cn}, SQ: {sq}")
         
         except Exception as e:
-            print(f"Error retrieving SQL template: {e}")
+            print(f"Error inserting record: {e}")
+            conn.rollback()  # Add rollback on error
+            raise
     return
 
            
@@ -92,7 +94,7 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
         
         course_info = read_sql_query(text(SQL.course_info), CNXN, params={'cn': slusd_course_code})
         mark = get_distilled_mark(row['Grade (NGR = No Grade Received)']) 
-        grade = row['GR']
+        grade = int(float(row['GR']))
         # if slusd_id is None or math.isnan(slusd_course_code):
         #     print(f"Skipping row {index} because 'ID' or 'SLUSD Course Code' is missing.")
         #     continue
@@ -121,19 +123,19 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
         print(f"Processing row {index}: SLUSD ID: {slusd_id}, College Course Number: {college_course_number}, SLUSD Course Code: {slusd_course_code}, Grade: {mark}")
         # print(f"Inserting course for SLUSD ID: {slusd_id}, Course Code: {slusd_course_code}, Grade: {mark}")
         insert_new_his_record(
-            pid=slusd_id,
-            cn=slusd_course_code,
-            mk=mark,
-            cr=credits_possible,
-            gr=grade,
-            te=term,
-            yr=yr,
-            st=school_taken,
-            cc=float(credits_complete),
-             sq=next_sq,
-             sde=school_dual_enrollment,
-             ch=ch
-            )
+            pid=int(slusd_id),
+            cn=str(slusd_course_code),
+            mk=str(mark),
+            cr=float(credits_possible),  
+            gr=int(grade),               
+            te=int(term),               
+            yr=int(yr),                 
+            st=int(school_taken),       
+            cc=float(credits_complete), 
+            sq=int(next_sq),           
+            sde=int(school_dual_enrollment), 
+            ch=float(ch)             
+        )
         break
     
 
