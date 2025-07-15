@@ -36,7 +36,7 @@ def get_next_sq(pid: int = None, id: int = None, table: str = 'his') -> int:
                 order by sq desc
                 """)
         last_sq = read_sql_query(sql, CNXN, params={'pid': pid})['sq'].iloc[0]
-        return last_sq + 1 if last_sq is not None else 1
+        return int(last_sq + 1) if last_sq is not None else 1
     elif id:
         sql = text(f"""
                 select 
@@ -47,8 +47,34 @@ def get_next_sq(pid: int = None, id: int = None, table: str = 'his') -> int:
                 order by sq desc
                 """)
         last_sq = read_sql_query(sql, CNXN, params={'id': id})['sq'].iloc[0]
-        return last_sq + 1 if last_sq is not None else 1
+        return int(last_sq + 1) if last_sq is not None else 1
+
+def insert_new_his_record(pid: int, cn: str, mk: str, cr: str, gr: str, te: str, yr: str, st: int, cc: str, sq: int, sde: int, ch: float) -> None:
+    with CNXN.connect() as conn:
+        sql = text(SQL.insert_his_record)
+        try:
+            conn.execute(sql, {
+                "pid":int(pid),
+                "cn":cn,
+                "mk":mk,
+                "cr":cr,
+                "gr":gr,
+                "te":te,
+                "yr":yr,
+                "st":st,
+                "cc":cc,
+                "sq":sq,
+                "sde":sde,
+                "ch":ch
+            })
+            conn.commit()
+            print(f"Successfully inserted new record for PID: {pid}, CN: {cn}, SQ: {sq}")
         
+        except Exception as e:
+            print(f"Error retrieving SQL template: {e}")
+    return
+
+           
 def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_courses_taken.csv',  school_taken:int = DEFAULT_SCHOOL_ST, school_dual_enrollment:int = DEFAULT_SCHOOL_SDE) -> None:
     all_courses = read_csv(courses_file_path)
     yr = config('DATABASE', cast=str)[3:5]
@@ -60,7 +86,7 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
 
         slusd_course_code = COURSE_MAP[college_course_number]['SLUSD Course Code'] if college_course_number in COURSE_MAP else None
         
-        if slusd_course_code is None or math.isnan(slusd_course_code):
+        if slusd_course_code is None or (type(slusd_course_code) == float and math.isnan(slusd_course_code)):
             slusd_course_code = '60001C'
         ic(slusd_course_code)
         
@@ -94,12 +120,20 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
         
         print(f"Processing row {index}: SLUSD ID: {slusd_id}, College Course Number: {college_course_number}, SLUSD Course Code: {slusd_course_code}, Grade: {mark}")
         # print(f"Inserting course for SLUSD ID: {slusd_id}, Course Code: {slusd_course_code}, Grade: {mark}")
-        try:
-            pass
-        except Exception as e:
-            print(f"Error retrieving SQL template: {e}")
-            return
-
+        insert_new_his_record(
+            pid=slusd_id,
+            cn=slusd_course_code,
+            mk=mark,
+            cr=credits_possible,
+            gr=grade,
+            te=term,
+            yr=yr,
+            st=school_taken,
+            cc=float(credits_complete),
+             sq=next_sq,
+             sde=school_dual_enrollment,
+             ch=ch
+            )
         break
     
 
