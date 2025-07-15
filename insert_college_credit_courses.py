@@ -49,34 +49,37 @@ def get_next_sq(pid: int = None, id: int = None, table: str = 'his') -> int:
         last_sq = read_sql_query(sql, CNXN, params={'id': id})['sq'].iloc[0]
         return int(last_sq + 1) if last_sq is not None else 1
 
-def insert_new_his_record(pid: int, cn: str, mk: str, cr: float, gr: int, te: int, yr: int, st: int, cc: float, sq: int, sde: int, ch: float) -> None:
+def insert_new_his_record(pid: int, cn: str, mk: str, cr: float, gr: int,  yr: int, st: int, cc: float, sq: int, sde: int, ch: float, te: int = 1, delete: int = 0) -> None:
+    params = {
+        "pid": int(pid),
+        "cn": str(cn), 
+        "mk": str(mk),
+        "cr": float(cr),
+        "gr": int(gr),
+        "te": int(te), 
+        "yr": int(yr),
+        "st": int(st),
+        "cc": float(cc),
+        "sq": int(sq),
+        "sde": int(sde),
+        "ch": float(ch)
+    }
+    
+    # Debug logging
+    # print(f"DEBUG - Parameters being passed:")
+    # for key, value in params.items():
+    #     print(f"  {key}: {value} (type: {type(value)})")
+    
     with CNXN.connect() as conn:
         sql = text(SQL.insert_his_record)
         try:
-            conn.execute(sql, {
-                "pid": int(pid),
-                "cn": str(cn),
-                "mk": str(mk),
-                "cr": float(cr), 
-                "gr": int(gr),    
-                "te": int(te),   
-                "yr": int(yr),    
-                "st": int(st),   
-                "cc": float(cc), 
-                "sq": int(sq),    
-                "sde": int(sde),  
-                "ch": float(ch)   
-            })
+            conn.execute(sql, params)
             conn.commit()
-            print(f"Successfully inserted new record for PID: {pid}, CN: {cn}, SQ: {sq}")
-        
+            core.log(f"Successfully inserted new record for PID: {pid}, CN: {cn}, SQ: {sq}")
         except Exception as e:
-            print(f"Error inserting record: {e}")
-            conn.rollback()  # Add rollback on error
+            core.log(f"Error inserting record: {e}")
             raise
-    return
-
-           
+@decorators.log_function_timer()           
 def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_courses_taken.csv',  school_taken:int = DEFAULT_SCHOOL_ST, school_dual_enrollment:int = DEFAULT_SCHOOL_SDE) -> None:
     all_courses = read_csv(courses_file_path)
     yr = config('DATABASE', cast=str)[3:5]
@@ -88,47 +91,41 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
 
         slusd_course_code = COURSE_MAP[college_course_number]['SLUSD Course Code'] if college_course_number in COURSE_MAP else None
         
-        if slusd_course_code is None or (type(slusd_course_code) == float and math.isnan(slusd_course_code)):
-            slusd_course_code = '60001C'
-        ic(slusd_course_code)
+        # if slusd_course_code is None or (type(slusd_course_code) == float and math.isnan(slusd_course_code)):
+        #     slusd_course_code = '60001C'
         
         course_info = read_sql_query(text(SQL.course_info), CNXN, params={'cn': slusd_course_code})
         mark = get_distilled_mark(row['Grade (NGR = No Grade Received)']) 
         grade = int(float(row['GR']))
-        # if slusd_id is None or math.isnan(slusd_course_code):
-        #     print(f"Skipping row {index} because 'ID' or 'SLUSD Course Code' is missing.")
-        #     continue
-        # if mark not in PASSING_MARKS:
-        #     if mark == 'NGR':
-        #         print(f"Skipping row {index} because 'Grade' is NGR (No Grade Received).")
-        #         continue
-        #     print(f"Skipping row {index} because 'Grade' is not valid: {mark}")
-        #     continue
+        if slusd_id is None or math.isnan(slusd_course_code):
+            core.log(f"Skipping row {index} because 'ID' or 'SLUSD Course Code' is missing.")
+            continue
+        if mark not in PASSING_MARKS:
+            if mark == 'NGR':
+                core.log(f"Skipping row {index} because 'Grade' is NGR (No Grade Received).")
+                continue
+            core.log(f"Skipping row {index} because 'Grade' is not valid: {mark}")
+            continue
         
-        # print(COURSE_MAP)
-        ic(COURSE_MAP[college_course_number])
-        
-        print(COURSE_MAP[college_course_number])
         credits_possible = course_info['CR'].iloc[0] if not course_info.empty else 5.00
         term = course_info['TM'].iloc[0] if not course_info.empty else 1
         credits_complete = credits_possible if mark in PASSING_MARKS else 0.00
         next_sq = get_next_sq(slusd_id)
         ch = COURSE_MAP[college_course_number]['Coll Units'] if slusd_course_code in COURSE_MAP else 0.00
         
-        print(f"Inserting course for SLUSD ID: {slusd_id}, Course Code: {slusd_course_code}, Grade: {mark}, Credits Possible: {credits_possible}, Credits Complete: {credits_complete}, Next SQ: {next_sq}")
+        core.log(f"Inserting course for SLUSD ID: {slusd_id}, Course Code: {slusd_course_code}, Grade: {mark}, Credits Possible: {credits_possible}, Credits Complete: {credits_complete}, Next SQ: {next_sq}")
         
-        print(f"Course info for {slusd_course_code}: CR = {credits_possible}, ch = {ch}")
+        core.log(f"Course info for {slusd_course_code}: CR = {credits_possible}, ch = {ch}")
         
         
-        print(f"Processing row {index}: SLUSD ID: {slusd_id}, College Course Number: {college_course_number}, SLUSD Course Code: {slusd_course_code}, Grade: {mark}")
-        # print(f"Inserting course for SLUSD ID: {slusd_id}, Course Code: {slusd_course_code}, Grade: {mark}")
+        core.log(f"Processing row {index}: SLUSD ID: {slusd_id}, College Course Number: {college_course_number}, SLUSD Course Code: {slusd_course_code}, Grade: {mark}")
         insert_new_his_record(
             pid=int(slusd_id),
             cn=str(slusd_course_code),
             mk=str(mark),
             cr=float(credits_possible),  
             gr=int(grade),               
-            te=int(term),               
+            # te=int(term),               
             yr=int(yr),                 
             st=int(school_taken),       
             cc=float(credits_complete), 
@@ -136,8 +133,12 @@ def insert_college_credit_courses(courses_file_path: str = 'in_data/chabot_cours
             sde=int(school_dual_enrollment), 
             ch=float(ch)             
         )
-        break
+        
     
 
 if __name__ == "__main__":
+    core.log("$"*80)
+    core.log(f"Starting insert_college_credit_courses")
     insert_college_credit_courses()
+    core.log("$"*80)
+    
